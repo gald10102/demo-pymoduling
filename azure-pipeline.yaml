@@ -32,6 +32,8 @@ jobs:
 
         # Run the build command
         python -m build
+        ls -l 
+        ls -l dist/
       displayName: 'Build Python Package'
 
     - script: |
