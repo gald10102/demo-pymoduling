@@ -1,0 +1,52 @@
+trigger:
+  branches:
+    include:
+      - main  # Trigger on pushes to the 'main' branch. Change as needed.
+
+pool:
+  vmImage: 'ubuntu-latest'  # Use Ubuntu as the build agent. You can also use Windows or macOS if needed.
+
+variables:
+  buildOutput: 'dist'  # Directory where build artifacts are stored
+  pythonVersion: '3.x'  # Specify the Python version you want to use (e.g., 3.8, 3.9)
+  jfrogUrl: 'https://trialt9c08c.jfrog.io/artifactory'  # Replace with your JFrog Artifactory URL
+  jfrogRepo: 'pypi-demo'  # Replace with your JFrog repository
+  jfrogApiKey: "cmVmdGtuOjAxOjE3NzQ4NTY5MzM6RDJNb3J5RVhVRGhFQlJCQjlIek1RRzVKNW1z"  # JFrog API Key (use a secret stored in Azure DevOps)
+
+jobs:
+- job: BuildAndPublish
+  displayName: 'Build Python Package and Publish to JFrog'
+  steps:
+
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: $(pythonVersion)
+        addToPath: true
+
+    - checkout: self  # Checkout the code from the repository
+
+    - script: |
+        # Install necessary tools
+        python -m pip install --upgrade pip
+        pip install build
+
+        # Run the build command
+        python -m build
+      displayName: 'Build Python Package'
+
+    - script: |
+        # Install JFrog CLI
+        curl -fL https://getcli.jfrog.io | sh
+        sudo mv jfrog /usr/local/bin
+
+        # Configure JFrog CLI with your Artifactory credentials
+        jfrog rt config --url=$(jfrogUrl) --apikey=$(jfrogApiKey) --interactive=false
+
+        # Publish the built package to JFrog Artifactory
+        jfrog rt u "$(Build.SourcesDirectory)/$(buildOutput)/*" $(jfrogRepo)/ --build-name=my-python-build --build-number=$(Build.BuildId)
+      displayName: 'Publish to JFrog Artifactory'
+
+    - script: |
+        # Clean up after the build
+        rm -rf $(Build.SourcesDirectory)/$(buildOutput)  # Clean the dist folder after upload
+      displayName: 'Clean up Build Artifacts'
